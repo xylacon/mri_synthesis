@@ -1,0 +1,25 @@
+% Load the NIfTI data for patient 1
+patient1 = niftiread('./Data/patient1.nii');
+
+% Extract tissue maps
+tissue_maps = extractTissueMaps(patient1);
+
+% Visualize a mid-slice of the 3D volume
+mid_slice = round(size(patient1_data, 3) / 2);
+figure;
+imshow(patient1(:, :, mid_slice), []);
+title('Patient 1 Mid-Slice');
+
+% Display the extracted data for verification
+figure;
+subplot(1, 3, 1);
+imshow(GM_data(:, :, mid_slice), []);
+title('Gray Matter (GM)');
+
+subplot(1, 3, 2);
+imshow(WM_data(:, :, mid_slice), []);
+title('White Matter (WM)');
+
+subplot(1, 3, 3);
+imshow(CSF_data(:, :, mid_slice), []);
+title('Cerebrospinal Fluid (CSF)');
