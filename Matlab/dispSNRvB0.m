@@ -6,7 +6,7 @@ function dispSNRvB0(B0, SNR_maps, patient_index)
     plot(B0, SNR_maps(:, 3), '-o', 'DisplayName', 'CSF');
     xlabel('B0 (T)');
     ylabel('SNR');
-    title('SNR vs B0');
+    title(['SNR vs B0 for Patient '], patient_index);
     legend;
     grid on;
 
