@@ -42,3 +42,26 @@ TR_T2 = calcTR(TE_T2);
 % Calculate BW
 BW_T1 = calcBW(TE_T1);
 BW_T2 = calcBW(TE_T2);
+
+% Calculate alpha
+alpha_T1 = calcAlpha_T1(TR_T1, T1{1}, T1{2});
+alpha_T2 = calcAlpha_T2(TR_T2, T1);
+
+% % % % % % % % % % %
+% SNR Map Generation %
+% % % % % % % % % % %
+SNR = calcSNR(B0(1));
+
+% % % % % % % % %
+% Noise Addition %
+% % % % % % % % %
+
+
+% % % % % % % % %
+% MRI Resolution %
+% % % % % % % % %
+
+
+% % % % % % % % % % %
+% Evaluation Metrics %
+% % % % % % % % % % %
