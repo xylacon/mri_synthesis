@@ -1,60 +1,74 @@
+% % % % % % % % % % %
+% FOLDER PREPARATION %
+% % % % % % % % % % %
+
+% Slices
+if ~exist('../Slices', 'dir')
+    mkdir('../Slices');
+end
+
+% Maps
+if ~exist('../Maps', 'dir')
+    mkdir('../Maps');
+end
+
+% Plots
+if ~exist('../Plots', 'dir')
+    mkdir('../Plots');
+end
+
+
 % % % % % % % % % %
 % DATA PREPARATION %
 % % % % % % % % % %
 
 % Load patient data
-patient1 = niftiread('../Data/patient1.nii');
+patient = niftiread('../Data/patient1.nii');
+patientID = 1;
 
-% Extract slice
-slice_index = 90;
-slice = extractSlice(patient1, slice_index);
-displaySlice(slice, slice_index, 1);
+% Variate B0 by increments of 0.5 from 0.5 to 9
+B0 = 0.5:0.5:9;
 
-% Extract and display tissue maps
-[GM, WM, CSF] = extractTissueMaps(patient1);
-tissue_maps = {GM, WM, CSF};
-displayTissueMaps(tissue_maps, slice_index, 1);
+% % Extract slice
+% slice_index = 90;
+% slice = extractSlice(patient, slice_index);
+% dispSlice(slice, slice_index, patientID);
+% 
+% % Extract and display tissue maps
+% [GM, WM, CSF] = extractTissueMaps(patient);
+% tissue_maps = {GM, WM, CSF};
+% dispTissueMaps(tissue_maps, slice_index, patientID);
+
 
 % % % % % % % % % % %
 % SIGNAL ACQUISITION %
 % % % % % % % % % % %
 
-% Variate B0 by increments of 0.5 from 0.5 to 9
-B0 = 0.5:0.5:9;
+% All tissue parameters are calculated in calcSNR()
 
-%%% Following should loop through B0_values,
-%%% but will implement later since testing
-%%% would take forever with all the outputs
-
-% Calculate relaxation times
-T1 = {calcT1('GM', B0(1)), calcT1('WM', B0(1)), calcT1('CSF', B0(1))};
-T2 = {calcT2('GM', B0(1)), calcT2('WM', B0(1)), calcT2('CSF', B0(1))};
-
-% Calculate TE and TR
-% T1-weighted
-TE_T1 = calcTE_T1(T2{2});
-TR_T1 = calcTR(TE_T1);
-
-% T2-weighted
-TE_T2 = calcTE_T2(T2{1}, T2{2});
-TR_T2 = calcTR(TE_T2);
-
-% Calculate BW
-BW_T1 = calcBW(TE_T1);
-BW_T2 = calcBW(TE_T2);
-
-% Calculate alpha
-alpha_T1 = calcAlpha_T1(TR_T1, T1{1}, T1{2});
-alpha_T2 = calcAlpha_T2(TR_T2, T1);
 
 % % % % % % % % % % %
 % SNR Map Generation %
 % % % % % % % % % % %
-SNR = calcSNR(B0(1));
+
+% Array to store SNR values
+SNR_maps = zeros(length(B0), 3, size(patient, 3));
+
+for slice_idx = 1:size(patient, 3)
+    for B0_idx = 1:length(B0)
+        SNR_maps(B0_idx, :, slice_idx) = calcSNR(patientID, B0(B0_idx), false, false);  % Returns [SNR_GM, SNR_WM, SNR_CSF]
+    end
+end
+
+slice_90 = squeeze(SNR_maps(:, :, 90));
+dispSNRvB0(B0, slice_90, 90, patientID);
+
 
 % % % % % % % % %
 % Noise Addition %
 % % % % % % % % %
+
+
 
 
 % % % % % % % % %
@@ -62,6 +76,9 @@ SNR = calcSNR(B0(1));
 % % % % % % % % %
 
 
+
+
 % % % % % % % % % % %
 % Evaluation Metrics %
 % % % % % % % % % % %
+

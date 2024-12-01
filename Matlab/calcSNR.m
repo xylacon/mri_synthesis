@@ -1,4 +1,4 @@
-function SNR = calcSNR(patientID, B0, isT2Weighted)
+function SNR = calcSNR(patientID, B0, isT2Weighted, doPrint)
     % tissue = GM, WM, or CSF
     % B0     = Magnetic field strength (arbitrary units)
     % BW     = Bandwidth (arbitrary units)
@@ -7,9 +7,11 @@ function SNR = calcSNR(patientID, B0, isT2Weighted)
     % T2     = Transverse relaxation time (seconds)
     % alpha  = Flip angle (radians)
     
-     % Default to T1-weighted
-    if nargin < 5
-        isT2Weighted = false;
+    if nargin < 4
+        doPrint = true;  % Print by default
+    end
+    if nargin < 3
+        isT2Weighted = false;  % T1-weighted by default
     end
 
     T1 = {calcT1('GM', B0), calcT1('WM', B0), calcT1('CSF', B0)};
@@ -17,16 +19,16 @@ function SNR = calcSNR(patientID, B0, isT2Weighted)
 
     if isT2Weighted
         % Use T2-weighted functions
-        TE = calcTE_T2(T2{1}, T2{2}, patientID, B0);
+        TE = calcTE_T2(T2{1}, T2{2}, doPrint, patientID, B0);
         TR = calcTR(TE);
         BW = calcBW(TE);
-        alpha = calcAlpha_T2(TR, T1, patientID, B0);
+        alpha = calcAlpha_T2(TR, T1, doPrint, patientID, B0);
     else
         % Use T1-weighted functions
         TE = calcTE_T1(T2{2});
         TR = calcTR(TE);
         BW = calcBW(TE);
-        alpha = calcAlpha_T1(TR, T1{1}, T1{2}, patientID, B0);
+        alpha = calcAlpha_T1(TR, T1{1}, T1{2}, doPrint, patientID, B0);
     end
 
     SNR = zeros(1, 3);
@@ -94,7 +96,7 @@ function TE = calcTE_T1(T2_WM)
     TE = T2_WM / 8;
 end
 
-function TE = calcTE_T2(T2_GM, T2_WM, patientID, B0)
+function TE = calcTE_T2(T2_GM, T2_WM, doPrint, patientID, B0)
     % T2_GM = T2 relaxation time (GM) (milliseconds)
     % T2_WM = T2 relaxation time (WM) (milliseconds)
     
@@ -113,7 +115,9 @@ function TE = calcTE_T2(T2_GM, T2_WM, patientID, B0)
     TE = TE_values(maxIndex);
 
     % Print optimal TE and display graph
-    printOptimal_TE(TE, maxContrast, TE_values, contrast_values, patientID, B0);
+    if doPrint
+        printOptimal_TE(TE, maxContrast, TE_values, contrast_values, patientID, B0);
+    end
 end
 function contrast = calcContrast_TE(TE, T2_GM, T2_WM)
     % Convert to seconds
@@ -143,7 +147,7 @@ function BW = calcBW(TE)
     end
 end
 
-function alpha = calcAlpha_T1(TR, T1_GM, T1_WM, patientID, B0)
+function alpha = calcAlpha_T1(TR, T1_GM, T1_WM, doPrint, patientID, B0)
     % TR    = Repetition time
     % T1_GM = T1 relaxation time (GM) (milliseconds)
     % T1_WM = T1 relaxation time (WM) (milliseconds)
@@ -164,7 +168,9 @@ function alpha = calcAlpha_T1(TR, T1_GM, T1_WM, patientID, B0)
     alpha = theta_values(maxIndex);
 
     % Print optimal alpha and display graph
-    printOptimal_alpha(alpha, maxContrast, theta_values, contrast_values, patientID, B0);
+    if doPrint
+        printOptimal_alpha(alpha, maxContrast, theta_values, contrast_values, patientID, B0);
+    end
 end
 function contrast = calcContrast_alpha(theta, TR, T1_GM, T1_WM)
     % Convert to seconds
@@ -179,7 +185,7 @@ function contrast = calcContrast_alpha(theta, TR, T1_GM, T1_WM)
     contrast = abs(S_GM - S_WM);
 end
 
-function alpha = calcAlpha_T2(TR, T1, patientID, B0)
+function alpha = calcAlpha_T2(TR, T1, doPrint, patientID, B0)
     % TR = Repetition time
     % T1 = T1 relaxation time (milliseconds)
 
@@ -191,7 +197,9 @@ function alpha = calcAlpha_T2(TR, T1, patientID, B0)
     alpha = rad2deg(EarnstAngle);
 
     % Display graph
-    print(alpha, T1, patientID, B0);
+    if doPrint
+        print(alpha, T1, patientID, B0);
+    end
 end
 
 % Print functions
