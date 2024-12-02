@@ -31,6 +31,11 @@ for i = 1:length(nii_files)
     patients{i} = niftiread(file_path);
 end
 
+% % Extract and display tissue maps
+% [GM, WM, CSF] = extractTissueMaps(patient);
+% tissue_maps = {GM, WM, CSF};
+% dispTissueMaps(tissue_maps, slice_index, patientID);
+
 % Variate B0 by increments of 0.5 from 0.5 to 9
 B0 = 0.5:0.5:9;
 
@@ -68,14 +73,19 @@ for patientID = 1 : length(patients)
     
     % Display SNR vs B0 graph
     dispSNRvB0(B0, SNR_maps, patientID);
+
+
+    % % % % % % % % %
+    % Noise Addition %
+    % % % % % % % % %
+
+    for i = 1 : length(B0)
+        if B0(i) == 1 || B0(i) == 3 || B0(i) == 7
+            slice_noise = addNoise(slice, B0(i), SNR_maps(i, :, slice_index));
+            dispSlice(slice_noise, slice_index + i, patientID);
+        end
+    end
 end
-
-
-% % % % % % % % %
-% Noise Addition %
-% % % % % % % % %
-
-
 
 
 % % % % % % % % %
