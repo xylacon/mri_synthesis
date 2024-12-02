@@ -99,3 +99,44 @@ end
 % Evaluation Metrics %
 % % % % % % % % % % %
 
+% Select slice and compute metrics
+slice_index = 90; % Slice containing CSF and WM
+for patientID = 1 : length(patients)
+    patient = patients{patientID};
+    slice = extractSlice(patient, slice_index);
+    
+    % Extract tissue maps
+    [GM, WM, CSF] = extractTissueMaps(slice);
+    
+    % Compute Gradient Entropy (gEn) for each tissue
+    gEn_GM = computeGradientEntropy(slice, GM);
+    gEn_WM = computeGradientEntropy(slice, WM);
+    gEn_CSF = computeGradientEntropy(slice, CSF);
+
+    % Display Gradient Entropy results
+    fprintf('Patient %d, Slice %d:\n', patientID, slice_index);
+    fprintf('Gradient Entropy (GM): %.4f\n', gEn_GM);
+    fprintf('Gradient Entropy (WM): %.4f\n', gEn_WM);
+    fprintf('Gradient Entropy (CSF): %.4f\n', gEn_CSF);
+
+    % Plot Gradient Entropy results
+    figure;
+    bar([gEn_GM, gEn_WM, gEn_CSF]);
+    set(gca, 'XTickLabel', {'GM', 'WM', 'CSF'});
+    ylabel('Gradient Entropy');
+    title(sprintf('Patient %d: Gradient Entropy (Slice %d)', patientID, slice_index));
+    saveas(gcf, fullfile('../Plots', sprintf('Patient_%d_Slice_%d_gEn.png', patientID, slice_index)));
+    
+    % Sharpness profile calculation
+    line_coords = [30, 50; 70, 50]; % Define line through CSF to WM
+    sharpnessProfile = computeSharpnessProfile(slice, line_coords);
+
+    % Plot Sharpness profile
+    figure;
+    plot(sharpnessProfile, 'LineWidth', 2);
+    xlabel('Pixel Index');
+    ylabel('Sharpness');
+    title(sprintf('Patient %d: Sharpness Profile (Slice %d)', patientID, slice_index));
+    grid on;
+    saveas(gcf, fullfile('../Plots', sprintf('Patient_%d_Slice_%d_SharpnessProfile.png', patientID, slice_index)));
+end
