@@ -112,6 +112,21 @@ for patientID = 1 : length(patients)
     end
 
 
+    % % % % % % % % %
+    % MRI Resolution %
+    % % % % % % % % %
+    
+    % Perform MRI Resolution Analysis
+    resolution_results = mri_resolution_analysis(GM, WM, CSF);
+    
+    % Access metrics
+    disp('SNR for 1mm x 1mm x 2mm:');
+    disp(resolution_results.Metrics.SNR_1mm_2mm);
+    
+    disp('Contrast between WM and GM:');
+    disp(resolution_results.Metrics.Contrast_WM_GM);
+
+
     % % % % % % % % % % %
     % Evaluation Metrics %
     % % % % % % % % % % %
@@ -147,19 +162,4 @@ for patientID = 1 : length(patients)
     title(sprintf('Patient %d: Sharpness Profile (Slice %d)', patientID, slice_index));
     grid on;
     saveas(gcf, fullfile('../Plots', sprintf('Patient_%d_Slice_%d_SharpnessProfile.png', patientID, slice_index)));
-
-
-    % % % % % % % % %
-    % MRI Resolution %
-    % % % % % % % % %
-    
-    % Perform MRI Resolution Analysis
-    resolution_results = mri_resolution_analysis(GM, WM, CSF);
-    
-    % Access metrics
-    disp('SNR for 1mm x 1mm x 2mm:');
-    disp(resolution_results.Metrics.SNR_1mm_2mm);
-    
-    disp('Contrast between WM and GM:');
-    disp(resolution_results.Metrics.Contrast_WM_GM);
 end
