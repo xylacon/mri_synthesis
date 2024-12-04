@@ -48,18 +48,6 @@ addpath(fullfile(project_root, 'Noise'));
 addpath(fullfile(project_root, 'Metrics'));
 addpath(fullfile(project_root, 'Resolution'));
 
-num_dims = ndims(patients{patient_id}.data);
-
-data_size = size(patients{patient_id}.data);
-disp(['Patient ', num2str(patient_id), ' data size: ', mat2str(data_size)]);
-
-% Check dimensionality
-if numel(data_size) == 3 && slice_to_display > data_size(3)
-    error('slice_to_display exceeds available slices for Patient %d.', patient_id);
-end
-
-
-
 % % % % % % % % % %
 % SNR COMPUTATIONS
 % % % % % % % % % %
@@ -70,70 +58,44 @@ B0 = 0.5:0.5:9; % Range of B0 values
 % Initialize storage for SNR maps
 SNR_maps = cell(num_patients, 1);
 
-% Define flip angles (in radians) for consistent computation
-theta = deg2rad(0:0.2:180); % Flip angles from 0 to 180 degrees
-num_theta = length(theta);
-
 % Loop through each patient
 for patient_id = 1:num_patients
     patient_data = patients{patient_id}.data;
     num_slices = size(patient_data, 3);
     num_B0 = length(B0);
     num_tissues = 3; % WM, GM, CSF
-
-    % Preallocate SNR maps, contrast, and optimal alpha values for this patient
+    
+    % Preallocate SNR maps for this patient
     SNR_maps{patient_id} = zeros(num_slices, num_B0, num_tissues);
-    all_contrast_values = zeros(num_slices, num_theta);
-    optimal_alpha_values = zeros(num_B0, 1); % Store optimal alpha for each B0
+    
+    % Compute relaxation times
+    [T1, T2] = compute_relaxation(B0);
 
-    % Process each slice
+    % Loop through slices
     for slice_idx = 1:num_slices
+        slice_data = patient_data(:, :, slice_idx); % Extract 2D slice
+        
+        % Loop through B0 values
         for b_idx = 1:num_B0
             % Compute TE, TR, BW
             T2_WM = T2(b_idx, 1); % Use T2 of WM for TE/TR/BW calculation
             [TE, TR, BW] = compute_TE_TR_BW(T2_WM, B0(b_idx));
-
-            % Compute optimal flip angle and contrast
+            
+            % Compute optimal flip angle
             T1_WM = T1(b_idx, 1);
             T1_GM = T1(b_idx, 2);
             [optimal_alpha, contrast] = compute_flip_angle(TR, T1_WM, T1_GM, theta);
-
-            % Store optimal alpha
-            optimal_alpha_values(b_idx) = optimal_alpha;
-
-            % Compute SNR for this slice and B0 value
-            alpha_rad = deg2rad(optimal_alpha); % Convert alpha to radians
-            SNR_maps{patient_id}(slice_idx, b_idx, :) = compute_SNR(...
+            alpha_rad = deg2rad(optimal_alpha); % Convert to radians
+            
+            % Compute SNR for this B0 value and slice
+            SNR_maps{patient_id}(slice_idx, b_idx, :) = compute_SNR(... 
                 B0(b_idx), ...
                 T1(b_idx, :), ...
                 T2(b_idx, :), ...
                 TE, TR, BW, alpha_rad ...
             );
-
-            % Store contrast for averaging
-            all_contrast_values(slice_idx, :) = contrast;
         end
     end
-
-    % Compute the average contrast across all slices
-    avg_contrast = mean(all_contrast_values, 1);
-
-    % Plot average Contrast vs Theta
-    theta_deg = rad2deg(theta); % Convert theta to degrees
-    figure;
-    plot(theta_deg, avg_contrast, '-b', 'LineWidth', 2);
-    xlabel('\theta [degrees]');
-    ylabel('Average Contrast (C_\theta)');
-    title(['Average Contrast vs Flip Angle - Patient ', num2str(patient_id)]);
-    grid on;
-
-    % Save the plot
-    avg_contrast_plot_path = fullfile(output_dir, sprintf('Patient%d_Average_Contrast_vs_FlipAngle.png', patient_id));
-    saveas(gcf, avg_contrast_plot_path);
-    disp(['Average Contrast vs Flip Angle plot saved for Patient ', num2str(patient_id), ': ', avg_contrast_plot_path]);
-
-    % Pass the optimal alpha values for reporting
-    generate_relaxation_report(B0, T1, T2, optimal_alpha_values, slice_snr, patient_id, output_dir);
 end
 
 % Save SNR maps
@@ -143,29 +105,34 @@ end
 save(fullfile(output_dir, 'SNR_maps.mat'), 'SNR_maps', 'B0');
 disp('SNR maps generated and saved successfully.');
 
-% Plot SNR for Slice 90 for Each Patient
-slice_to_display = 90;
+% Define the slice to analyze
+slice_to_display = 90; 
 
+% Loop through each patient
 for patient_id = 1:num_patients
-    % Ensure slice_to_display is within range
     num_slices = size(SNR_maps{patient_id}, 1);
+    
+    % Ensure the slice exists
     if slice_to_display > num_slices
         error('Slice %d exceeds available slices for Patient %d.', slice_to_display, patient_id);
     end
 
-    % Extract SNR values for slice 90
+    % Extract SNR values for the specific slice
     slice_snr = squeeze(SNR_maps{patient_id}(slice_to_display, :, :)); % [B0 x Tissues]
 
     % Plot SNR vs B0 for WM, GM, and CSF
-    plot_SNR(B0, slice_snr); % Call the plot_SNR function here
+    plot_SNR(B0, slice_snr); % Call the plot_SNR function
 
     % Save the plot
     slice_plot_path = fullfile(output_dir, sprintf('Patient%d_SNR_Slice90.png', patient_id));
     saveas(gcf, slice_plot_path);
     disp(['SNR Slice 90 plot saved for Patient ', num2str(patient_id), ': ', slice_plot_path]);
+
+    % Generate relaxation report with correct slice_snr
+    generate_relaxation_report(B0, T1, T2, optimal_alpha_values, slice_snr, patient_id, output_dir);
 end
 
-% Generate and save T1 and T2* plots and generate reports for each patient
+% Generate and save T1 and T2* plots for each patient
 for patient_id = 1:num_patients
     % T1 and T2* plots
     t1_plot_path = fullfile(output_dir, sprintf('Patient%d_T1_vs_B0.png', patient_id));
@@ -189,10 +156,9 @@ for patient_id = 1:num_patients
     legend('WM', 'GM', 'CSF'); grid on;
     saveas(gcf, t2_plot_path);
     disp(['T2 vs B0 plot saved for Patient ', num2str(patient_id), ': ', t2_plot_path]);
-
-    % Generate relaxation report
-    generate_relaxation_report(B0, T1, T2, optimal_alpha_values, slice_snr, patient_id, output_dir);
 end
+
+disp('Main program completed successfully.');
 
 
 
@@ -214,60 +180,71 @@ end
 slice_to_display = 90; % Slice to visualize
 sigma_n = 40 * (1 + log(B0)); % Compute noise variance for each B0
 
-% Loop through each patient
+% Loop through each patient for computations
 for patient_id = 1:num_patients
-    if size(patients{patient_id}.data, 3) < slice_to_display
-        error('Slice %d does not exist for patient %d.', slice_to_display, patient_id);
+    patient_data = patients{patient_id}.data;
+    num_slices = size(patient_data, 3);
+
+    % Validate slice selection
+    if slice_to_analyze > num_slices
+        error('Slice %d exceeds available slices for Patient %d.', slice_to_analyze, patient_id);
     end
 
-    % Add noise to the slice for each B0 value
-    noisy_images = add_noise(patients, slice_to_display, sigma_n, patient_id);
+    % Initialize storage for Gradient Entropy and Sharpness Profiles
+    gEn_values = zeros(length(B0), 3); % Columns for CSF, GM, WM
+    sharpness_profiles = zeros(length(B0), 1);
 
-    % Compute Signal Intensity (SI) by averaging over spatial dimensions (x, y)
-    SI = squeeze(mean(mean(noisy_images, 2), 3)); % Reduce noisy_images to [B0 x Tissues]
+    % Extract the selected slice
+    slice = patient_data(:, :, slice_to_analyze);
 
-    % Visualize noisy images at selected B0 values
-    selected_B0 = [1, 5, 10, 15]; % Indices for example B0 values
-    visualize_noisy_images(noisy_images, B0, selected_B0);
+    % Create tissue masks and remove background
+    background_mask = slice > 0;
+    csf_mask = create_mask(slice, 'CSF') & background_mask;
+    gm_mask = create_mask(slice, 'GM') & background_mask;
+    wm_mask = create_mask(slice, 'WM') & background_mask;
 
-    % Noise Effect Report
-    noise_report_file = fullfile(output_dir, sprintf('Patient%d_Noise_Effect_Report.txt', patient_id));
-    report_noise_effect(B0, sigma_n, SI, noise_report_file);
-    disp(['Noise effect report saved for Patient ', num2str(patient_id), ': ', noise_report_file]);
+    % Compute Gradient Entropy for each B0
+    for b_idx = 1:length(B0)
+        gEn_values(b_idx, 1) = compute_gradient_entropy(slice, csf_mask); % CSF
+        gEn_values(b_idx, 2) = compute_gradient_entropy(slice, gm_mask); % GM
+        gEn_values(b_idx, 3) = compute_gradient_entropy(slice, wm_mask); % WM
+    end
+
+    % Save and visualize Gradient Entropy
+    save(fullfile(output_dir, sprintf('Patient%d_gradient_entropy.mat', patient_id)), 'gEn_values', 'B0');
+    visualize_gradient_entropy(B0, gEn_values, patient_id, output_dir);
+
+
 end
 
 
-% % % % % % % % % %
-% METRICS COMPUTATIONS
-% % % % % % % % % %
+    % Perform MRI Resolution Simulations
+    resolution_metrics{patient_id} = struct();
+    for r = 1:length(resolutions)
+        for t = 1:length(slice_thicknesses)
+            % Resample in-plane resolution
+            resampled_data = resample_in_plane(patient_data, resolutions{r});
+            
+            % Modify slice thickness
+            thickened_data = modify_slice_thickness(resampled_data, slice_thicknesses(t));
+            
+            % Compute metrics: image quality, contrast, SNR
+            [image_quality, contrast, snr_value] = compute_resolution_metrics(... 
+                thickened_data, resolutions{r}, slice_thicknesses(t));
+            
+            % Store metrics
+            resolution_metrics{patient_id}.(['res_', num2str(r), '_thick_', num2str(t)]) = ...
+                struct('quality', image_quality, 'contrast', contrast, 'SNR', snr_value);
+            
+            % Plot sharpness vs resolution
+            %visualize_sharpness_vs_resolution(B0, resolutions{r}, thickened_data, patient_id, output_dir);
+        end
+    end
 
-% Slice to analyze
-slice_to_analyze = 90;
-
-% Gradient Entropy Metrics
-gEn_values = zeros(length(B0), 3); % Preallocate for CSF, GM, WM
-
-% Example: Predefined masks for tissues
-csf_mask = create_mask(patients{1}.data(:, :, slice_to_analyze), 'CSF');
-wm_mask = create_mask(patients{1}.data(:, :, slice_to_analyze), 'WM');
-gm_mask = create_mask(patients{1}.data(:, :, slice_to_analyze), 'GM');
-
-% Compute metrics for each B0 value
-for b_idx = 1:length(B0)
-    slice = patients{1}.data(:, :, slice_to_analyze);
-
-    % Compute Gradient Entropy
-    gEn_values(b_idx, 1) = compute_gradient_entropy(slice, csf_mask);
-    gEn_values(b_idx, 2) = compute_gradient_entropy(slice, gm_mask);
-    gEn_values(b_idx, 3) = compute_gradient_entropy(slice, wm_mask);
-end
-
-% Save and visualize metrics
-save(fullfile(output_dir, 'gradient_entropy.mat'), 'gEn_values', 'B0');
-% Call visualize_gradient_entropy with output_dir
-visualize_gradient_entropy(B0, gEn_values, patient_id, output_dir);
-
-
+    % Generate resolution metrics report
+    report_file = fullfile(output_dir, sprintf('resolution_metrics_patient%d.txt', patient_id));
+    generate_resolution_report(resolution_metrics{patient_id}, report_file);
+    disp(['Resolution metrics report saved for Patient ', num2str(patient_id), ': ', report_file]);
 
 % % % % % % % % % % 
 % MRI RESOLUTION SIMULATIONS
@@ -327,8 +304,6 @@ for patient_id = 1:num_patients
     generate_resolution_report(resolution_metrics{patient_id}, report_file);
     disp(['Resolution metrics report saved for Patient ', num2str(patient_id), ': ', report_file]);
 end
-
-
 
 % Local function definition
 function mask = create_mask(slice_data, tissue_type)
