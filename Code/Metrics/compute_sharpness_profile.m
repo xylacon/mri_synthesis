@@ -1,45 +1,35 @@
-function sharpness = compute_sharpness_profile(slice, csf_coord, wm_coord)
-    % Computes the sharpness profile using sigmoidal modeling
+function gEn = compute_gradient_entropy(slice, mask)
+    % Computes Gradient Entropy for a given slice and mask
     %
     % Inputs:
     %   slice - 2D array representing the MRI slice
-    %   csf_coord - Starting coordinate (row, col) for CSF
-    %   wm_coord - Ending coordinate (row, col) for WM
+    %   mask - Binary mask for the region of interest (e.g., CSF, GM, WM)
     %
     % Outputs:
-    %   sharpness - Sharpness profile value for the specified path
+    %   gEn - Gradient Entropy value for the masked region
 
-    % Extract intensity values along the line between CSF and WM
-    intensity_profile = improfile(slice, [csf_coord(2), wm_coord(2)], [csf_coord(1), wm_coord(1)]);
-    
-    % Remove NaN values that might arise from `improfile`
-    intensity_profile = intensity_profile(~isnan(intensity_profile));
+    % Apply the mask to the slice
+    masked_slice = double(slice) .* double(mask);
 
-    % Debug: Check intensity_profile size
-    disp(['Intensity profile size: ', num2str(numel(intensity_profile))]);
+    % Compute the gradient of the masked slice
+    [Gx, Gy] = gradient(masked_slice);
 
-    % Normalize the intensity profile
-    intensity_profile = intensity_profile / max(intensity_profile);
+    % Magnitude of the gradient
+    gradient_magnitude = sqrt(Gx.^2 + Gy.^2);
 
-    % Create the x vector with the same size as intensity_profile
-    x = linspace(0, 1, numel(intensity_profile));
+    % Restrict to the region of interest
+    gradient_magnitude = gradient_magnitude(mask > 0);
 
-    % Debug: Check x size
-    disp(['x size: ', num2str(numel(x))]);
-
-    % Fit a sigmoid to the intensity profile
-    sigmoid_model = @(p, x) p(1) ./ (1 + exp(-p(2) * (x - p(3))));
-    initial_guess = [1, 10, 0.5];
-    opts = optimset('Display', 'off');
-    
-    % Ensure sizes match before fitting
-    if numel(intensity_profile) ~= numel(x)
-        error('Size mismatch: intensity_profile and x must have the same number of elements.');
+    % Normalize the gradient values
+    if ~isempty(gradient_magnitude) % Avoid division by zero
+        gradient_magnitude = gradient_magnitude / max(gradient_magnitude(:));
+    else
+        gEn = 0; % If no valid gradient, entropy is zero
+        return;
     end
 
-    % Perform curve fitting
-    params = lsqcurvefit(sigmoid_model, initial_guess, x, intensity_profile, [], [], opts);
-
-    % Extract sharpness (k) from the fitted sigmoid parameters
-    sharpness = params(2); % The steepness parameter represents sharpness
+    % Compute entropy
+    histogram_bins = 256; % Define the number of bins
+    hist_counts = histcounts(gradient_magnitude, histogram_bins, 'Normalization', 'probability');
+    gEn = -sum(hist_counts(hist_counts > 0) .* log2(hist_counts(hist_counts > 0)));
 end
