@@ -1,16 +1,28 @@
-function [T1, T2] = compute_relaxation(B0)
-    % Initialize relaxation times
-    num_B0 = length(B0);
-    T1 = zeros(num_B0, 3); % WM, GM, CSF
-    T2 = zeros(num_B0, 3); % WM, GM, CSF
+function [optimal_alpha, contrast] = compute_flip_angle(TR, T1_WM, T1_GM, theta)
+    % Computes the optimal flip angle and contrast vs. flip angle
+    % 
+    % Inputs:
+    %   TR - Repetition time (ms)
+    %   T1_WM - T1 relaxation time for WM (ms)
+    %   T1_GM - T1 relaxation time for GM (ms)
+    %   theta - Flip angles (radians)
+    %
+    % Outputs:
+    %   optimal_alpha - Optimal flip angle (degrees)
+    %   contrast - Contrast values (C_theta)
 
-    % T1 relaxation times (ms)
-    T1(:, 1) = 900 + 300 * log(B0);    % WM
-    T1(:, 2) = 1200 + 400 * log(B0);   % GM
-    T1(:, 3) = 2000 + 500 * log(B0);   % CSF
+    contrast = zeros(size(theta));
 
-    % T2 relaxation times (ms)
-    T2(:, 1) = 80 - 5 * B0;  % WM
-    T2(:, 2) = 100 - 6 * B0; % GM
-    T2(:, 3) = 300 - 20 * B0; % CSF
+    % Compute contrast
+    for i = 1:length(theta)
+        S_WM = ((1 - exp(-TR / T1_WM)) * sin(theta(i))) / ...
+               (1 - cos(theta(i)) * exp(-TR / T1_WM));
+        S_GM = ((1 - exp(-TR / T1_GM)) * sin(theta(i))) / ...
+               (1 - cos(theta(i)) * exp(-TR / T1_GM));
+        contrast(i) = abs(S_WM - S_GM);
+    end
+
+    % Find optimal flip angle
+    [~, max_idx] = max(contrast);
+    optimal_alpha = rad2deg(theta(max_idx));
 end
