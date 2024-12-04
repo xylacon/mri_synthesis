@@ -1,24 +1,28 @@
-%compute echo times (TE), repetition time (TR), and bandwidth (BW)%
+%Compute SNR for WM GM and CSF%
 
-function [TE, TR, BW] = compute_TE_TR_BW(T2_WM, B0)
-    % Computes TE, TR, and BW
+function SNR = compute_SNR(B0, T1, T2, TE, TR, BW, alpha)
+    % Computes SNR for WM, GM, and CSF
     %
     % Inputs:
-    %   T2_WM - T2 relaxation times for white matter (ms)
-    %   B0 - Array of magnetic field strengths (T)
+    %   B0 - Magnetic field strength (T)
+    %   T1, T2 - Relaxation times (ms)
+    %   TE, TR - Echo and repetition times (ms)
+    %   BW - Bandwidth
+    %   alpha - Flip angle (radians)
     %
     % Outputs:
-    %   TE - Echo time (ms)
-    %   TR - Repetition time (ms)
-    %   BW - Bandwidth (arbitrary units)
+    %   SNR - Signal-to-noise ratio for each tissue
 
-    % Dead time constant (s)
-    DeadTime = 3e-3;
+    TE = TE * 1e-3;
+    TR = TR * 1e-3;
 
-    % TE and TR computation
-    TE = T2_WM / 8; % Use T2 for WM
-    TR = 2 * TE;
+    num_tissues = size(T1, 2);
+    SNR = zeros(length(B0), num_tissues);
 
-    % Bandwidth computation
-    BW = 1 ./ (2 * TE * 1e-3 - DeadTime); % Convert TE to seconds
+    for t = 1:num_tissues
+        SNR(:, t) = (B0 * 1e3 ./ sqrt(BW)) .* sin(alpha) .* ...
+                    exp(-TE ./ T2(:, t)) .* ...
+                    (1 - exp(-TR ./ T1(:, t))) ./ ...
+                    (1 - cos(alpha) .* exp(-TR ./ T1(:, t)));
+    end
 end
